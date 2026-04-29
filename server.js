@@ -31,39 +31,31 @@ async function querySQL(dbId, sql) {
     })
   });
   const data = await response.json();
-  return data.data ? data.data.rows : [];
+  return { rows: data.data ? data.data.rows : [], cols: data.data ? data.data.cols : [] };
 }
 
 async function queryAllPages(cardId, sqlFn) {
   const dbId = await getCardDbId(cardId);
   const periods = [
-    ['2025-01-01', '2025-12-31'],
-    ['2026-01-01', '2026-06-30'],
+    ['2025-05-01', '2025-11-01'],
+    ['2025-11-01', '2026-02-01'],
+    ['2026-02-01', '2026-03-15'],
+    ['2026-03-15', '2026-04-10'],
+    ['2026-04-10', '2026-05-01'],
+    ['2026-05-01', '2026-12-31'],
   ];
+
   let allRows = [];
   let cols = null;
 
   for (const [from, to] of periods) {
-    const sql = sqlFn(from, to);
-    const response = await fetch(`${METABASE_URL}/api/dataset`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-API-KEY': METABASE_API_KEY
-      },
-      body: JSON.stringify({
-        database: dbId,
-        type: 'native',
-        native: { query: sql },
-        parameters: []
-      })
-    });
-    const data = await response.json();
-    if (data.data) {
-      if (!cols) cols = data.data.cols;
-      allRows = allRows.concat(data.data.rows);
-    }
+    const { rows, cols: c } = await querySQL(dbId, sqlFn(from, to));
+    if (!cols && c.length) cols = c;
+    allRows = allRows.concat(rows);
+    console.log(`Period ${from} → ${to}: ${rows.length} rows`);
   }
+
+  console.log(`Total rows: ${allRows.length}`);
   return { data: { cols, rows: allRows } };
 }
 
